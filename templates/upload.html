@@ -1,0 +1,21 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 
+  Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+    <title></title>
+</head>
+
+<body>
+    <h1>FL-Server Upload Form for RO</h1>
+    <p>リソースサーバにモデルをアップロードし，ポリシーを設定する．</p>
+    <br>
+    <p>{{ name }} is successfully uploaded!</p>
+    <br>
+    <h2>PAT 発行エンドポイントに移動して，PATを発行する．</h2>
+    <form action="/redirect-pat" method="post">
+        <button type="submit" value="redirect-pat">issue pat</button>
+    </form>
+</body>
+
+</html>
