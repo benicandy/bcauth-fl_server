@@ -27,6 +27,10 @@ def index():
 @app.route('/upload', methods=['post'])
 def upload():
 
+    if 'uid' not in request.form['uid']:
+        make_response(jsonify({'result': 'user id is required.'}))
+    uid = request.form['uid']
+
     if 'uploadFile' not in request.files:
         make_response(jsonify({'result': 'uploadFile is required.'}))
     file = request.files['uploadFile']
@@ -126,7 +130,8 @@ def reg_resource_post():
             'resource_scopes': ['read'],
             'description': "sample dataset",
             'icon_uri': "",
-            'name': checks[0]
+            'name': checks[0],
+            'type': ""
         }
     }
     headers = {
@@ -139,7 +144,11 @@ def reg_resource_post():
     # リクエストを投げてレスポンスを得る
     with urllib.request.urlopen(req) as res:
         body = res.read()
-        resource_id = body.resource_id
+        body = body.decode('utf8').replace("'", '"')
+        print("body: ", body)
+        body = json.loads(body)
+        print("body: ", body)
+        resource_id = body['response']['resource_id']
 
     # リソース ID を表示し，ポリシー設定エンドポイントへ誘導する
     html = """
@@ -153,25 +162,24 @@ def reg_resource_post():
 
     <body>
         <h1>FL-Server Upload Form for RO</h1>
-        <p>リソースサーバにモデルをアップロードし，ポリシーを設定する．</p>
+        <p>認可ブロックチェーンにリソースが登録されたので，ポリシーを設定する．</p>
         <br>
-        <p>Resource: {{ resource }} is successfully uploaded!</p>
+        <p>Resource << {0} >> is successfully registered!</p>
         <br>
         <h2>ポリシー設定エンドポイントに移動して，ポリシーを設定します．</h2>
         <form action="/set-policy" method="post">
             <button type="submit" value="set-policy">set policy</button>
-            <input type="hidden" name="resource" value={0}
-            <input type="hidden" name="rid" value={1}">
+            <input type="hidden" name="resource" value={1}>
+            <input type="hidden" name="rid" value={2}">
         </form>
     </body>
 
     </html>
-    """.format(checks[0], resource_id)
+    """.format(checks[0], checks[0], resource_id)
+    
     template = Template(html)
-    data = {'resource': checks[0]}
 
-    return template.render(data)
-    # return jsonify({'header': req.headers}), 200
+    return template.render()
 
 
 @app.route('/set-policy', methods=['post'])
