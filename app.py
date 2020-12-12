@@ -170,7 +170,7 @@ def reg_resource_post():
         <form action="/set-policy" method="post">
             <button type="submit" value="set-policy">set policy</button>
             <input type="hidden" name="resource" value={1}>
-            <input type="hidden" name="rid" value={2}">
+            <input type="hidden" name="rid" value={2}>
         </form>
     </body>
 
