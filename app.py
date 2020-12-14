@@ -132,7 +132,9 @@ def reg_resource_post():
             'icon_uri': "",
             'name': checks[0],
             'type': ""
-        }
+        },
+        'timestamp': "1595230979",
+        'timeSig': "vF9Oyfm+G9qS4/Qfns5MgSZNYjOPlAIZVECh2I5Z7HHgdloy5q7gJoxi7c1S2/ebIQbEMLS05x3+b0WD0VJfcWSUwZMHr3jfXYYwbeZ1TerKpvfp1j21nZ+OEP26bc28rLRAYZsVQ4Ilx7qp+uLfxu9X9x37Qj3n0CI2TEiKYSSYDQ0bftQ/3iWSSoGjsDljh9bKz1eVL911KeUGO+t/9IkB6LtZghdbIlnGISbgrVGoEOtGHi0t8uD2Vh/CRyBe+XnQV3HQtkjddLQitAesKTYunK1Ctia3x7klVjRH9XiJ11q6IbR8gz7rchdHYZe6HP+w/LyWMS5z6M26AXQrVw=="
     }
     headers = {
         'Authorization': 'Bearer {}'.format(pat),
@@ -176,7 +178,7 @@ def reg_resource_post():
 
     </html>
     """.format(checks[0], checks[0], resource_id)
-    
+
     template = Template(html)
 
     return template.render()
@@ -193,26 +195,97 @@ def set_policy():
     return redirect('http://tff-01.ctiport.net:8888/policy?' + qs, code=301)
 
 
-# ---------------------------------------------------------------------- #
+# --- リソースアクセスフェーズ ---------------------------------------------------- #
 
-@app.route('/req-resource')
+@app.route('/req-resource', methods=['post'])
 def req_resource():
+    """
+    :req_header Content-Type application/json:
+    :req_header Authorization Bearer: RPT
+    :req_param string resource_id: 要求するリソースの ID
+    :req_param list resource_scopes: 要求するリソースのスコープ
+    """
     # rpt がなければ tff-01.ctiport.net:8888/token へ誘導
-    if request.args.get('rpt') == None:
-        return redirect(url_for('authorize'), code=301)
+    # -> 現状，通信相手は backend としているので，リダイレクトではなく uri を示す
+    if not request.headers.get('Content-Type') == 'application/json':
+        error_message = {
+            'error': 'not supported Content-Type'
+        }
+        return make_response(jsonify(error_message), 400)
+    try:
+        header_authz = request.headers.get('Authorization')
+        bearer = header_authz.split('Bearer ')[-1]
+    except:
+        body = request.get_data().decode('utf8').replace("'", '"')
+        body = json.loads(body)
 
-    rpt = request.args.get('rpt')
+        rid = body['resource_id']
+        request_scopes = body['request_scopes']
+        param = {
+            'resource_id': rid,
+            'request_scopes': request_scopes
+        }
+        qs = urllib.parse.urlencode(param)
+        return redirect(url_for('authorize') + '?' + qs, 301)
 
     # rpt を検証(tff-01.ctiport.net:8888/intro)
-    if rpt != "string":
-        return make_response(jsonify({'message': "Invalid RPT"}), 400)
+    # some process
 
     return make_response(jsonify({'message': "success"}), 200)
 
 
 @app.route('/authorize')
 def authorize():
-    return make_response(jsonify({'message': "redirect to tff-01.ctiport.net:8888/token"}), 200)
+    # パラメータの受け取り
+    rid = request.args.get('resource_id')
+    _scopes = request.args.get('request_scopes')
+    _scopes = _scopes.replace("[", "").replace("]", "").replace("'", "").strip() # 文字列処理
+    print("_scopes: ", _scopes)
+    try:
+        # スコープが複数ある場合
+        request_scopes = _scopes.split(",")
+    except:
+        request_scopes = [_scopes]
+
+    # 認可エンドポイント(/perm)との通信
+    perm_url = 'http://tff-01.ctiport.net:8888/perm'
+    timestamp = "1595230979"
+    timeSig = "vF9Oyfm+G9qS4/Qfns5MgSZNYjOPlAIZVECh2I5Z7HHgdloy5q7gJoxi7c1S2/ebIQbEMLS05x3+b0WD0VJfcWSUwZMHr3jfXYYwbeZ1TerKpvfp1j21nZ+OEP26bc28rLRAYZsVQ4Ilx7qp+uLfxu9X9x37Qj3n0CI2TEiKYSSYDQ0bftQ/3iWSSoGjsDljh9bKz1eVL911KeUGO+t/9IkB6LtZghdbIlnGISbgrVGoEOtGHi0t8uD2Vh/CRyBe+XnQV3HQtkjddLQitAesKTYunK1Ctia3x7klVjRH9XiJ11q6IbR8gz7rchdHYZe6HP+w/LyWMS5z6M26AXQrVw=="
+    data = {
+        'resource_id': rid,
+        'request_scopes': request_scopes,
+        'timestamp': timestamp,
+        'timeSig': timeSig
+    }
+    print("data: ", data)
+    headers = {
+        'Content-Type': 'application/json'
+    }
+    perm_req = urllib.request.Request(url=perm_url, data=json.dumps(data).encode('utf8'), headers=headers)
+
+    # Request to http://tff-01.ctiport.net:8888/perm
+    with urllib.request.urlopen(perm_req) as res:
+        body = res.read()
+        body = body.decode('utf8').replace("'", '"')
+        body = json.loads(body)
+        ticket = body['response']['ticket']
+    redirect_uri = "http://tff-01.ctiport.net:8888/token"
+
+    # web client へのレスポンス
+    res = {
+        'response': {
+            'ticket': ticket,
+            'redirect_uri': redirect_uri
+        }
+    }
+
+    return make_response(json.dumps(res), 200)
+
+
+@app.route('/authorize', methods=['post'])
+def authorize_post():
+    # rpt がない場合
+    return None
 
 
 if __name__ == "__main__":
