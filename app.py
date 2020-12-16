@@ -36,7 +36,7 @@ def upload():
     file = request.files['uploadFile']
     filename = file.filename
     if '' == filename:
-        make_response(jsonify({'result': 'filename must not empth.'}))
+        make_response(jsonify({'result': 'filename must not be empty.'}))
 
     os.makedirs(UPLOAD_DIR + "/" + uid, exist_ok=True)
 
@@ -239,7 +239,8 @@ def authorize():
     # パラメータの受け取り
     rid = request.args.get('resource_id')
     _scopes = request.args.get('request_scopes')
-    _scopes = _scopes.replace("[", "").replace("]", "").replace("'", "").strip() # 文字列処理
+    _scopes = _scopes.replace("[", "").replace(
+        "]", "").replace("'", "").strip()  # 文字列処理
     print("_scopes: ", _scopes)
     try:
         # スコープが複数ある場合
@@ -261,7 +262,8 @@ def authorize():
     headers = {
         'Content-Type': 'application/json'
     }
-    perm_req = urllib.request.Request(url=perm_url, data=json.dumps(data).encode('utf8'), headers=headers)
+    perm_req = urllib.request.Request(
+        url=perm_url, data=json.dumps(data).encode('utf8'), headers=headers)
 
     # Request to http://tff-01.ctiport.net:8888/perm
     with urllib.request.urlopen(perm_req) as res:
@@ -269,13 +271,13 @@ def authorize():
         body = body.decode('utf8').replace("'", '"')
         body = json.loads(body)
         ticket = body['response']['ticket']
-    redirect_uri = "http://tff-01.ctiport.net:8888/token"
+    token_endpoint = "http://tff-01.ctiport.net:8888/token"
 
     # web client へのレスポンス
     res = {
         'response': {
             'ticket': ticket,
-            'redirect_uri': redirect_uri
+            'token_endpoint': token_endpoint
         }
     }
 
