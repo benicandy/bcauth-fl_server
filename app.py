@@ -19,7 +19,7 @@ app.config['MAX_CONTENT_LENGTH'] = 1 * 1024 * 1024
 UPLOAD_DIR = "./uploaded"
 
 
-@app.route('/')
+@app.route('/fl-server')
 def index():
     return render_template('index.html')
 
@@ -166,7 +166,7 @@ def reg_resource_post():
         <h1>FL-Server Upload Form for RO</h1>
         <p>認可ブロックチェーンにリソースが登録されたので，ポリシーを設定する．</p>
         <br>
-        <p>Resource << {0} >> is successfully registered!</p>
+        <p>Resource << {0} >> is successfully registered.</p>
         <br>
         <h2>ポリシー設定エンドポイントに移動して，ポリシーを設定します．</h2>
         <form action="/set-policy" method="post">
@@ -197,7 +197,7 @@ def set_policy():
 
 # --- リソースアクセスフェーズ ---------------------------------------------------- #
 
-@app.route('/req-resource', methods=['post'])
+@app.route('/resource', methods=['post'])
 def req_resource():
     """
     :req_header Content-Type application/json:
@@ -211,7 +211,7 @@ def req_resource():
         error_message = {
             'error': 'not supported Content-Type'
         }
-        return make_response(jsonify(error_message), 400)
+        return make_response(json.dumps({'response': error_message}), 400)
     try:
         header_authz = request.headers.get('Authorization')
         bearer = header_authz.split('Bearer ')[-1]
@@ -229,9 +229,30 @@ def req_resource():
         return redirect(url_for('authorize') + '?' + qs, 301)
 
     # rpt を検証(tff-01.ctiport.net:8888/intro)
-    # some process
+    intro_url = "http://tff-01.ctiport.net:8888/intro"
+    data = {
+        'access_token': bearer
+    }
+    headers = {
+        'Content-Type': 'application/json'
+    }
+    intro_req = urllib.request.Request(url=intro_url, data=json.dumps(data).encode('utf8'), headers=headers)
+    
+    # Request to http://tff-01.ctiport.net:8888/intro
+    with urllib.request.urlopen(intro_req) as res:
+        body = res.read()
+        body = body.decode('utf8').replace("'", '"')
+        body = json.loads(body)
+    
+    try:
+        active = body['response']['Active']
+        expire = body['response']['Expire']
+        permissions = body['response']['Permissions']
+    except:
+        err_msg = body['response']
+        return make_response(json.dumps({'response': err_msg}), 400)
 
-    return make_response(jsonify({'message': "success"}), 200)
+    return make_response(json.dumps({'response': body['response']}), 200)
 
 
 @app.route('/authorize')
@@ -270,7 +291,12 @@ def authorize():
         body = res.read()
         body = body.decode('utf8').replace("'", '"')
         body = json.loads(body)
+
+    try:
         ticket = body['response']['ticket']
+    except:
+        err_msg = body['response']
+        return make_response(json.dumps({'response': err_msg}), 400)
     token_endpoint = "http://tff-01.ctiport.net:8888/token"
 
     # web client へのレスポンス
