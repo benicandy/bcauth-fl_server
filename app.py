@@ -205,8 +205,7 @@ def req_resource():
     :req_param string resource_id: 要求するリソースの ID
     :req_param list resource_scopes: 要求するリソースのスコープ
     """
-    # rpt がなければ tff-01.ctiport.net:8888/token へ誘導
-    # -> 現状，通信相手は backend としているので，リダイレクトではなく uri を示す
+    # ヘッダをチェック
     if not request.headers.get('Content-Type') == 'application/json':
         error_message = {
             'error': 'not supported Content-Type'
@@ -215,6 +214,7 @@ def req_resource():
     try:
         header_authz = request.headers.get('Authorization')
         bearer = header_authz.split('Bearer ')[-1]
+    # rpt がなければ tff-01.ctiport.net:8888/token へ誘導
     except:
         body = request.get_data().decode('utf8').replace("'", '"')
         body = json.loads(body)
@@ -236,22 +236,71 @@ def req_resource():
     headers = {
         'Content-Type': 'application/json'
     }
-    intro_req = urllib.request.Request(url=intro_url, data=json.dumps(data).encode('utf8'), headers=headers)
-    
+    intro_req = urllib.request.Request(
+        url=intro_url, data=json.dumps(data).encode('utf8'), headers=headers)
+
     # Request to http://tff-01.ctiport.net:8888/intro
     with urllib.request.urlopen(intro_req) as res:
         body = res.read()
         body = body.decode('utf8').replace("'", '"')
         body = json.loads(body)
-    
+
+    # RPT の情報を取り出す
     try:
-        active = body['response']['Active']
-        expire = body['response']['Expire']
-        permissions = body['response']['Permissions']
+        active = body['response']['Active']  # RPT がアクティブか否か
+        expire = body['response']['Expire']  # RPT の有効期限
+        li_permissions = body['response']['Permissions']  # 許可されるパーミッションのリスト
     except:
         err_msg = body['response']
         return make_response(json.dumps({'response': err_msg}), 400)
 
+    print("response: ", body['response'])
+
+    # active に関する処理
+    # some process
+
+    # expire に関する処理
+    # some process
+
+    # li_permissions (include 'resource_id', 'expire', 'resource_scopes')に関する処理
+    # 条件を満たすリソース名の一覧を作成
+    permitted_resources = []
+    for perm in li_permissions:
+        # expire に関する処理
+        # some process
+
+        # resource_id と resource_scopes に関する処理
+        # Step 1. リソース ID とそのスコープを抽出
+        resource_id = perm['ResourceId']
+        resource_scopes = perm['ResourceScopes']
+
+        # Step 2. スコープに 'read' が含まれて入れば，リソース ID からリソース名を呼び出す(from tff-01.ctiport.net)
+        for e in resource_scopes:
+            if e == 'read':
+                rreg_endpoint = "http://tff-01.ctiport.net:8888/rreg"
+                data = {
+                    'resource_id': resource_id
+                }
+                headers = {
+                    'Content-Type': 'application/json'
+                }
+                rreg_req = urllib.request.Request(
+                    url=rreg_endpoint,
+                    data=json.dumps(data).encode('utf8'),
+                    headers=headers
+                )
+
+
+
+        # Step 3. リソース名をリストに格納
+        DIR = './uploaded/'  # データディレクトリ
+        permitted_resources.append(DIR + name)
+
+    
+    # tff モジュールにデータを与える
+    # from my_tff import my_fl_server, my_fl_client
+    # model = my_fl_server.federated_train(permitted_resources)
+    # model を返す
     return make_response(json.dumps({'response': body['response']}), 200)
 
 
