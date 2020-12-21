@@ -3,6 +3,7 @@ from flask import abort, redirect, url_for
 from jinja2 import Template
 
 import urllib.request
+import zipfile
 
 import os
 import json
@@ -15,6 +16,7 @@ app = Flask(__name__)
 
 # limited upload file size: 100MB
 app.config['MAX_CONTENT_LENGTH'] = 1 * 1024 * 1024 * 100
+
 
 UPLOAD_DIR = "./uploaded"
 
@@ -40,7 +42,7 @@ def upload():
 
     try:
         saveFileName = datetime.now().strftime("%Y%m%d_%H%M%S_") \
-        + werkzeug.utils.secure_filename(filename)
+            + werkzeug.utils.secure_filename(filename)
         file.save(os.path.join(UPLOAD_DIR+"/"+uid, saveFileName))
     except:
         return make_response(jsonify({'response': "error: invalid user id"}))
@@ -89,7 +91,7 @@ def reg_resource():
 
     <body>
     <h1>Reg API</h1>
-    <p>ユーザID: {{ uid }}</p>
+    <p>ユーザID: {0}</p>
     <h2>リソース一覧</h2>
     <p> tff スコープを許可するリソースを＜一つ＞選択する．</p>
     <form action="/reg-resource" method="post">
@@ -101,17 +103,15 @@ def reg_resource():
 
     html += """
         <br>
+        <input type="hidden" name="uid" value={0}>
         <input type="submit" name="register">
     </form>
     </body>
 
     </html>
-    """
+    """.format(uid)
 
-    template = Template(html)
-    data = {'uid': uid}
-
-    return template.render(data)
+    return template.render()
 
 
 @app.route('/reg-resource', methods=['post'])
@@ -123,6 +123,8 @@ def reg_resource_post():
     pat = request.form['pat']
     # 選択したリソース名を受け取る
     checks = request.form.getlist('check')
+    # uid を受け取る
+    uid = request.form['uid']
 
     # リソースを AB に登録するリクエストを生成する(tff-01.ctiport.net:8888/rreg)
     rreg_url = 'http://tff-01.ctiport.net:8888/rreg'
@@ -131,7 +133,7 @@ def reg_resource_post():
             'resource_scopes': ['tff'],
             'description': "sample_dataset",
             'icon_uri': "",
-            'name': checks[0],
+            'name': uid + '/' + checks[0],
             'type': ""
         },
         'timestamp': "1595230979",
@@ -200,6 +202,7 @@ def set_policy():
 
 @app.route('/resource', methods=['post'])
 def req_resource():
+    # RPT を検証後，RqP の ACL を作成・更新する
     """
     :req_header Content-Type application/json:
     :req_header Authorization Bearer: RPT
@@ -287,7 +290,7 @@ def req_resource():
         for e in resource_scopes:
             if e == 'tff':
                 flag = True
-        
+
         if flag:
             rreg_endpoint = "http://tff-01.ctiport.net:8888/rreg-call"
             data = {
@@ -313,13 +316,27 @@ def req_resource():
         DIR = './uploaded/'  # データディレクトリ
         permitted_resources.append(DIR + name)
 
+    # リソースの zip を作成する
     print("permitted_resources: ", permitted_resources)
-    # tff モジュールにデータを与えてモデルを作成する
-    import my_fl_server
-    model = my_fl_server.federated_train(permitted_resources)
-    # model を返す（要修正）
-    return make_response(json.dumps({'response': body['response']}), 200)
-
+    ZIP_DIR = './resource_zip/'
+    FILENAME = 'resource.zip'
+    ZIP_PATH = ZIP_DIR + FILENAME
+    with zipfile.ZipFile(ZIP_PATH, 'w', compression=zipfile.ZIP_DEFLATED) as new_zip:
+        DIR = './uploaded/'
+        for name in permitted_resources:
+            ARC_PATH = DIR + name
+            new_zip.write(ZIP_PATH, arcname=ARC_PATH)
+    
+    # Client にダウンロードさせる
+    downloadFile = ZIP_PATH
+    downloadFileName = FILENAME
+    ZIP_MIMETYPE = 'application/json'
+    
+    response = make_response()
+    response.data = open(downloadFile, 'rb').read()
+    response.headers = ['Content-Disposition'] = 'attachment; filename=' + downloadFileName
+    response.mimetype = ZIP_MIMETYPE
+    return response
 
 @app.route('/authorize')
 def authorize():
@@ -376,10 +393,14 @@ def authorize():
     return make_response(json.dumps(res), 200)
 
 
-@app.route('/authorize', methods=['post'])
-def authorize_post():
-    # rpt がない場合
-    return None
+@app.route('/train-model', methods=['post'])
+def train_model():
+    
+    # tff モジュールにデータを与えてモデルを作成する
+    import my_fl_server
+    model = my_fl_server.federated_train(permitted_resources)
+    # model を返す（要修正）
+    return make_response(json.dumps({'response': body['response']}), 200)
 
 
 if __name__ == "__main__":
