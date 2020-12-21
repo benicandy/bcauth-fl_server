@@ -6,9 +6,7 @@ from PIL import Image
 import os
 
 # ***** FL-Server **************************************
-"""
-:param li_data_dir: 訓練したいデータを記録したディレクトリのリスト
-"""
+
 
 def _train(mnist_train, mnist_test):
     # mnist_train.shape: (2, )
@@ -52,6 +50,9 @@ def _train(mnist_train, mnist_test):
 
 
 def federated_train(li_data_dir):
+    """
+    :param li_data_dir: 訓練したいデータを記録したディレクトリのリスト
+    """
     fl_data = []  # 全データ
     for dir in li_data_dir:
         li_file = [f for f in files if os.path.isfile(os.path.join(dir, f))]

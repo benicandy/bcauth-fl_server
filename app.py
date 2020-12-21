@@ -13,8 +13,8 @@ app = Flask(__name__)
 
 # FL-Server API
 
-# limited upload file size: 1MB
-app.config['MAX_CONTENT_LENGTH'] = 1 * 1024 * 1024
+# limited upload file size: 100MB
+app.config['MAX_CONTENT_LENGTH'] = 1 * 1024 * 1024 * 100
 
 UPLOAD_DIR = "./uploaded"
 
@@ -32,17 +32,18 @@ def upload():
     uid = request.form['uid']
 
     if 'uploadFile' not in request.files:
-        make_response(jsonify({'result': 'uploadFile is required.'}))
+        return make_response(jsonify({'result': 'uploadFile is required.'}))
     file = request.files['uploadFile']
     filename = file.filename
     if '' == filename:
-        make_response(jsonify({'result': 'filename must not be empty.'}))
+        return make_response(jsonify({'result': 'filename must not be empty.'}))
 
-    os.makedirs(UPLOAD_DIR + "/" + uid, exist_ok=True)
-
-    saveFileName = datetime.now().strftime("%Y%m%d_%H%M%S_") \
+    try:
+        saveFileName = datetime.now().strftime("%Y%m%d_%H%M%S_") \
         + werkzeug.utils.secure_filename(filename)
-    file.save(os.path.join(UPLOAD_DIR+"/"+uid, saveFileName))
+        file.save(os.path.join(UPLOAD_DIR+"/"+uid, saveFileName))
+    except:
+        return make_response(jsonify({'response': "error: invalid user id"}))
 
     return render_template('upload.html', name=filename)
 
@@ -90,7 +91,7 @@ def reg_resource():
     <h1>Reg API</h1>
     <p>ユーザID: {{ uid }}</p>
     <h2>リソース一覧</h2>
-    <p> read スコープを許可するリソースを＜一つ＞選択する．</p>
+    <p> tff スコープを許可するリソースを＜一つ＞選択する．</p>
     <form action="/reg-resource" method="post">
     """
     html += '<input type="hidden" name="pat" value=' + pat + '><br>\n'
@@ -127,8 +128,8 @@ def reg_resource_post():
     rreg_url = 'http://tff-01.ctiport.net:8888/rreg'
     data = {
         'resource_description': {
-            'resource_scopes': ['read'],
-            'description': "sample dataset",
+            'resource_scopes': ['tff'],
+            'description': "sample_dataset",
             'icon_uri': "",
             'name': checks[0],
             'type': ""
@@ -264,6 +265,13 @@ def req_resource():
 
     # li_permissions (include 'resource_id', 'expire', 'resource_scopes')に関する処理
     # 条件を満たすリソース名の一覧を作成
+
+    # PAT の呼び出し（方法は未定）
+    # (ro01, rs) - rid = 08db20ba-2666-5b91-9bef-3d5b7d9138ae
+    pat = "0xddb5ab8c5405830359d2af4ec8d4bdf27bc4b8ee7d20f64ec1a71a634e551"
+    # (ro02, rs) - rid = 1c1f1d9f-051c-592f-bb06-5ec8cef664ba
+    #pat = "0x23e6958b1f555b905ade2f915c8c64453bd9514c4e1750d995f17215cbc4"
+
     permitted_resources = []
     for perm in li_permissions:
         # expire に関する処理
@@ -274,33 +282,42 @@ def req_resource():
         resource_id = perm['ResourceId']
         resource_scopes = perm['ResourceScopes']
 
-        # Step 2. スコープに 'read' が含まれて入れば，リソース ID からリソース名を呼び出す(from tff-01.ctiport.net)
+        # Step 2. スコープに 'tff' が含まれて入れば，リソース ID からリソース名を呼び出す(from tff-01.ctiport.net)
+        flag = False
         for e in resource_scopes:
-            if e == 'read':
-                rreg_endpoint = "http://tff-01.ctiport.net:8888/rreg"
-                data = {
-                    'resource_id': resource_id
-                }
-                headers = {
-                    'Content-Type': 'application/json'
-                }
-                rreg_req = urllib.request.Request(
-                    url=rreg_endpoint,
-                    data=json.dumps(data).encode('utf8'),
-                    headers=headers
-                )
-
-
+            if e == 'tff':
+                flag = True
+        
+        if flag:
+            rreg_endpoint = "http://tff-01.ctiport.net:8888/rreg-call"
+            data = {
+                'resource_id': resource_id
+            }
+            headers = {
+                'Content-Type': 'application/json',
+                'Authorization': "Bearer {}".format(pat)
+            }
+            rreg_req = urllib.request.Request(
+                url=rreg_endpoint,
+                data=json.dumps(data).encode('utf8'),
+                headers=headers
+            )
+            # Request to http://tff-01.ctiport.net:8888/rreg-call
+            with urllib.request.urlopen(rreg_req) as res:
+                body = res.read()
+                body = body.decode('utf8').replace("'", '"')
+                body = json.loads(body)
+                name = body['response']['name']  # リソース名
 
         # Step 3. リソース名をリストに格納
         DIR = './uploaded/'  # データディレクトリ
         permitted_resources.append(DIR + name)
 
-    
-    # tff モジュールにデータを与える
-    # from my_tff import my_fl_server, my_fl_client
-    # model = my_fl_server.federated_train(permitted_resources)
-    # model を返す
+    print("permitted_resources: ", permitted_resources)
+    # tff モジュールにデータを与えてモデルを作成する
+    import my_fl_server
+    model = my_fl_server.federated_train(permitted_resources)
+    # model を返す（要修正）
     return make_response(json.dumps({'response': body['response']}), 200)
 
 

@@ -1,8 +1,6 @@
 from silence_tensorflow import silence_tensorflow
 import numpy as np
 import collections
-import nest_asyncio
-nest_asyncio.apply()
 
 # ログ抑制（tf の import 前に実行する）
 silence_tensorflow()
