@@ -7,7 +7,7 @@
 </head>
 
 <body>
-    <h1>FL-Server Upload Form for RO</h1>
+    <h1>FL-Server</h1>
     <p>リソースサーバにモデルをアップロードし，ポリシーを設定する．</p>
     <h2>ファイルを選択してアップロード(zip)</h2>
 
@@ -17,6 +17,24 @@
         <input type="file" name="uploadFile" accept=".zip" required><br>
         <br>
         <button type="submit" value="upload">upload</button>
+        <br>
+        <br>
+        <p>（エンティティ）<br>
+            FLクライアント/リソース所有者：自身の持つデータを利用してFederated Learningを行い，グローバルモデルを構築したい．<br>
+            FLサーバ/リソースサーバ：Federated Learningのイニシャルモデル配布及び差分の平均を算出し，グローバルモデルを更新する．<br>
+            認可ブロックチェーン：リソース所有者からリソース利用者への認可情報を管理，及びリソースサーバ上のリソースを保護する．<br>
+            リソース利用者：Federated Learningによって得られるグローバルモデルを利用したい．<br>
+            UMAクライアント：リソース利用者がグローバルモデルを利用するためのアプリケーションを提供する．<br>
+            <br>
+            （前提）<br>
+            FLサーバはイニシャルモデルをFLクライアントに配布済み．<br>
+            FLクライアントはローカルデータでイニシャルモデルを訓練し，モデル差分を算出済み．<br>
+            <br>
+            （手続き内容01）<br>
+            リソース所有者はモデル差分をリソースサーバに提出する．<br>
+            </p>
+
+        <p><img src="/static/images/rreg01.png" width="841" height="500"></p>
     </form>
 </body>
 

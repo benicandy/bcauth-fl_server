@@ -7,15 +7,23 @@
 </head>
 
 <body>
-    <h1>FL-Server Upload Form for RO</h1>
+    <h1>FL-Server</h1>
     <p>リソースサーバにモデルをアップロードし，ポリシーを設定する．</p>
-    <br>
     <p>{{ name }} is successfully uploaded!</p>
     <br>
-    <h2>PAT 発行エンドポイントに移動して，PATを発行する．</h2>
+    <h3>PAT 発行エンドポイントに移動して，PATを発行する．</h3>
     <form action="/redirect-pat" method="post">
         <button type="submit" value="redirect-pat">issue pat</button>
     </form>
+    <br>
+    <br>
+    （手続き内容02）<br>
+    モデル差分の提出が完了した．<br>
+    次のページでは，提出したモデル差分を外部の認可システムを用いて他者によるアクセスから保護するための準備を実行する．<br>
+    すなわち，リソース所有者は認可ブロックチェーン上でPATと呼ばれるアクセストークンを生成し，リソースサーバに対し付与する．<br>
+    </p>
+
+    <p><img src="/static/images/rreg02.png" width="841" height="500"></p>
 </body>
 
 </html>

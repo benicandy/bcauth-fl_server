@@ -1,3 +1,4 @@
+#-*- coding:utf-8 -*-
 from flask import Flask, render_template, make_response, request, jsonify
 from flask import abort, redirect, url_for
 from jinja2 import Template
@@ -18,7 +19,7 @@ app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 1 * 1024 * 1024 * 100
 
 
-UPLOAD_DIR = "./uploaded"
+UPLOAD_DIR = "./resource/"
 
 
 @app.route('/fl-server')
@@ -43,7 +44,7 @@ def upload():
     try:
         saveFileName = datetime.now().strftime("%Y%m%d_%H%M%S_") \
             + werkzeug.utils.secure_filename(filename)
-        file.save(os.path.join(UPLOAD_DIR+"/"+uid, saveFileName))
+        file.save(os.path.join(UPLOAD_DIR+uid, saveFileName))
     except:
         return make_response(jsonify({'response': "error: invalid user id"}))
 
@@ -72,7 +73,7 @@ def reg_resource():
         return jsonify({'message': 'forbidden'}), 403
 
     # リソース一覧を取得
-    path = "./uploaded/" + uid
+    path = UPLOAD_DIR + uid
     try:
         files = os.listdir(path)
     except:
@@ -95,7 +96,7 @@ def reg_resource():
     <h2>リソース一覧</h2>
     <p> tff スコープを許可するリソースを＜一つ＞選択する．</p>
     <form action="/reg-resource" method="post">
-    """
+    """.format(uid)
     html += '<input type="hidden" name="pat" value=' + pat + '><br>\n'
     for i in range(len(li_files)):
         html += '<input type="checkbox" name="check" value=' \
@@ -106,10 +107,21 @@ def reg_resource():
         <input type="hidden" name="uid" value={0}>
         <input type="submit" name="register">
     </form>
+        <br>
+        <br>
+        （手続き内容04）<br>
+        リソース所有者は，認可ブロックチェーンを用いて保護したいリソース（＝モデル差分）を登録する．<br>
+        ここでは，「tff」として定義されるアクションだけが実行できるように保護されるように設定する．<br>
+        「tff」はTensorflow FederatedによるFederated Learningを実行するためにモデル差分を取得する行為のことを指すものとする．<br>
+        </p>
+
+        <p><img src="/static/images/rreg04.png" width="841" height="500"></p>
     </body>
 
     </html>
     """.format(uid)
+
+    template = Template(html)
 
     return template.render()
 
@@ -170,6 +182,7 @@ def reg_resource_post():
         <p>認可ブロックチェーンにリソースが登録されたので，ポリシーを設定する．</p>
         <br>
         <p>Resource << {0} >> is successfully registered.</p>
+        <p>resource_id: {2}
         <br>
         <h2>ポリシー設定エンドポイントに移動して，ポリシーを設定します．</h2>
         <form action="/set-policy" method="post">
@@ -177,6 +190,13 @@ def reg_resource_post():
             <input type="hidden" name="resource" value={1}>
             <input type="hidden" name="rid" value={2}>
         </form>
+        <br>
+        <br>
+        （手続き内容05）<br>
+        認可ブロックチェーンへのリソースの登録が完了し，リソースに対して一意の識別子が割当てられた．<br>
+        次のページでは，リソース所有者は登録されたリソースに対し，どのようなエンティティにリソースへのアクセスを許可するか（＝認可ポリシー）を定義する．<br>
+        </p>
+        <p><img src="/static/images/rreg05.png" width="841" height="500"></p>
     </body>
 
     </html>
@@ -218,15 +238,21 @@ def req_resource():
     try:
         header_authz = request.headers.get('Authorization')
         bearer = header_authz.split('Bearer ')[-1]
+
+        body = request.get_data().decode('utf8').replace("'", '"')
+        body = json.loads(body)
+        resource_id = body['resource_id']
+        request_scopes = body['request_scopes']
+
     # rpt がなければ tff-01.ctiport.net:8888/token へ誘導
     except:
         body = request.get_data().decode('utf8').replace("'", '"')
         body = json.loads(body)
 
-        rid = body['resource_id']
+        resource_id = body['resource_id']
         request_scopes = body['request_scopes']
         param = {
-            'resource_id': rid,
+            'resource_id': resource_id,
             'request_scopes': request_scopes
         }
         qs = urllib.parse.urlencode(param)
@@ -282,19 +308,27 @@ def req_resource():
 
         # resource_id と resource_scopes に関する処理
         # Step 1. リソース ID とそのスコープを抽出
-        resource_id = perm['ResourceId']
+        rid = perm['ResourceId']
         resource_scopes = perm['ResourceScopes']
 
-        # Step 2. スコープに 'tff' が含まれて入れば，リソース ID からリソース名を呼び出す(from tff-01.ctiport.net)
-        flag = False
-        for e in resource_scopes:
-            if e == 'tff':
-                flag = True
+        # Step 2. リソーススコープにリクエストスコープが全て含まれていれば，リソース ID からリソース名を呼び出す(from tff-01.ctiport.net)
+        flag = True  # リクエストスコープ全体の判定用
+        print(request_scopes)
+        print(resource_scopes)
+        for req_scope in request_scopes:
+            _flag = False  # 個別のリクエストスコープ判定用
+            for scope in resource_scopes:
+                if req_scope == scope:
+                    _flag = True
+                    break
+            if _flag is not True:
+                flag = False
+                break
 
         if flag:
             rreg_endpoint = "http://tff-01.ctiport.net:8888/rreg-call"
             data = {
-                'resource_id': resource_id
+                'resource_id': rid
             }
             headers = {
                 'Content-Type': 'application/json',
@@ -313,30 +347,30 @@ def req_resource():
                 name = body['response']['name']  # リソース名
 
         # Step 3. リソース名をリストに格納
-        DIR = './uploaded/'  # データディレクトリ
-        permitted_resources.append(DIR + name)
+        permitted_resources.append(name)
 
     # リソースの zip を作成する
     print("permitted_resources: ", permitted_resources)
-    ZIP_DIR = './resource_zip/'
-    FILENAME = 'resource.zip'
+    ZIP_DIR = './zipped/'
+    FILENAME = resource_id + '.zip'
     ZIP_PATH = ZIP_DIR + FILENAME
     with zipfile.ZipFile(ZIP_PATH, 'w', compression=zipfile.ZIP_DEFLATED) as new_zip:
-        DIR = './uploaded/'
         for name in permitted_resources:
-            ARC_PATH = DIR + name
-            new_zip.write(ZIP_PATH, arcname=ARC_PATH)
-    
+            ARC_NAME = name.split('/')[-1]  # ファイル名だけを抽出
+            new_zip.write(UPLOAD_DIR+name, arcname=ARC_NAME)
+
     # Client にダウンロードさせる
     downloadFile = ZIP_PATH
     downloadFileName = FILENAME
     ZIP_MIMETYPE = 'application/json'
-    
+
     response = make_response()
     response.data = open(downloadFile, 'rb').read()
-    response.headers = ['Content-Disposition'] = 'attachment; filename=' + downloadFileName
+    response.headers['Content-Disposition'] = 'attachment; filename=' + \
+        downloadFileName
     response.mimetype = ZIP_MIMETYPE
     return response
+
 
 @app.route('/authorize')
 def authorize():
@@ -395,7 +429,7 @@ def authorize():
 
 @app.route('/train-model', methods=['post'])
 def train_model():
-    
+
     # tff モジュールにデータを与えてモデルを作成する
     import my_fl_server
     model = my_fl_server.federated_train(permitted_resources)
