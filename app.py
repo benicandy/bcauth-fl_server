@@ -21,6 +21,14 @@ app.config['MAX_CONTENT_LENGTH'] = 1 * 1024 * 1024 * 100
 
 UPLOAD_DIR = "./resource/"
 
+# stylesheet更新用の関数（システムとは無関係）
+@app.context_processor
+def add_staticfile():
+    def staticfile_cp(fname):
+        path = os.path.join(app.root_path, 'static/css', fname)
+        mtime =  str(int(os.stat(path).st_mtime))
+        return '/static/css/' + fname + '?v=' + str(mtime)
+    return dict(staticfile=staticfile_cp)
 
 @app.route('/fl-server')
 def index():
@@ -48,7 +56,7 @@ def upload():
     except:
         return make_response(jsonify({'response': "error: invalid user id"}))
 
-    return render_template('upload.html', name=filename)
+    return render_template('upload.html', name=filename, uid=uid)
 
 
 @app.route('/redirect-pat', methods=['post'])
@@ -87,35 +95,43 @@ def reg_resource():
     <html xmlns="http://www.w3.org/1999/xhtml">
 
     <head>
-    <title></title>
+        <meta charset="UTF-8">
+        <link rel="stylesheet" type="text/css"
+            href="/static/css/style.css">
+        <link rel="stylesheet" type="text/css"
+            href="/static/css/procedure.css">
+        <title>FL-Server</title>
     </head>
 
+
     <body>
-    <h1>Reg API</h1>
-    <p>ユーザID: {0}</p>
-    <h2>リソース一覧</h2>
-    <p> tff スコープを許可するリソースを＜一つ＞選択する．</p>
+    <h1>FL-Server</h1>
+    <p><b>FL-Server User ID: {0}</b></p>
+    <h2>Resource List</h2>
+    <p>Select <b>one</b> resource to allow <i>tff</i> scope.</p>
     <form action="/reg-resource" method="post">
     """.format(uid)
+
     html += '<input type="hidden" name="pat" value=' + pat + '><br>\n'
     for i in range(len(li_files)):
         html += '<input type="checkbox" name="check" value=' \
             + li_files[i] + '>' + li_files[i] + '<br>\n'
 
     html += """
-        <br>
-        <input type="hidden" name="uid" value={0}>
-        <input type="submit" name="register">
+    <br>
+    <input type="hidden" name="uid" value={0}>
+    <input type="submit" name="register">
     </form>
         <br>
         <br>
-        （手続き内容04）<br>
-        リソース所有者は，認可ブロックチェーンを用いて保護したいリソース（＝モデル差分）を登録する．<br>
-        ここでは，「tff」として定義されるアクションだけが実行できるように保護されるように設定する．<br>
-        「tff」はTensorflow FederatedによるFederated Learningを実行するためにモデル差分を取得する行為のことを指すものとする．<br>
+        <blockquote>
+        <u>Procedure 04</u><br>
+        Resource owner registers a resource (i.e., model difference) that wants to protect  using the authorization blockchain. (3)<br>
+        Here, it is set to be protected so that only actions defined as <i>tff</i> can be executed.
+        In this demo, the term <i>tff</i> refers to the act of obtaining model differences to perform Federated Learning with Tensorflow Federated.
         </p>
-
-        <p><img src="/static/images/rreg04.png" width="841" height="500"></p>
+        </blockquote>
+        <p><img src="/static/images/rreg04.png" width="673" height="400"></p>
     </body>
 
     </html>
@@ -174,17 +190,23 @@ def reg_resource_post():
     <html xmlns="http://www.w3.org/1999/xhtml">
 
     <head>
-        <title></title>
+        <meta charset="UTF-8">
+        <link rel="stylesheet" type="text/css"
+            href="/static/css/style.css">
+        <link rel="stylesheet" type="text/css"
+            href="/static/css/procedure.css">
+        <title>FL-Server</title>
     </head>
 
     <body>
-        <h1>FL-Server Upload Form for RO</h1>
-        <p>認可ブロックチェーンにリソースが登録されたので，ポリシーを設定する．</p>
+        <h1>FL-Server</h1>
+        <p><b>FL-Server User ID: {0}</b></p>
+        <p>Now that the resource has been registered in the authorization blockchain, set the authorization policy.</p>
         <br>
-        <p>Resource << {0} >> is successfully registered.</p>
-        <p>resource_id: {2}
+        <p><b>{1}</b> has been successfully registered.</p>
+        <p><b>resource_id: {2}</b>
         <br>
-        <h2>ポリシー設定エンドポイントに移動して，ポリシーを設定します．</h2>
+        <h2>Go to the policy setting endpoint and set the policy.</h2>
         <form action="/set-policy" method="post">
             <button type="submit" value="set-policy">set policy</button>
             <input type="hidden" name="resource" value={1}>
@@ -192,15 +214,18 @@ def reg_resource_post():
         </form>
         <br>
         <br>
-        （手続き内容05）<br>
-        認可ブロックチェーンへのリソースの登録が完了し，リソースに対して一意の識別子が割当てられた．<br>
-        次のページでは，リソース所有者は登録されたリソースに対し，どのようなエンティティにリソースへのアクセスを許可するか（＝認可ポリシー）を定義する．<br>
+        <blockquote>
+        <u>Procedure 05</u><br>
+        The registration of the resource to the authorization blockchain is completed, and the resource on the corresponding resource server is protected by the authorization blockchain. (4)<br>
+        A unique identifier is assigned to each resource in the authorization blockchain.
+        In the next page, the resource owner defines the authorization policy for the registered resource.
         </p>
-        <p><img src="/static/images/rreg05.png" width="841" height="500"></p>
+        </blockquote>
+        <p><img src="/static/images/rreg05.png" width="673" height="400"></p>
     </body>
 
     </html>
-    """.format(checks[0], checks[0], resource_id)
+    """.format(uid, checks[0], resource_id)
 
     template = Template(html)
 
@@ -300,6 +325,8 @@ def req_resource():
     pat = "0xddb5ab8c5405830359d2af4ec8d4bdf27bc4b8ee7d20f64ec1a71a634e551"
     # (ro02, rs) - rid = 1c1f1d9f-051c-592f-bb06-5ec8cef664ba
     #pat = "0x23e6958b1f555b905ade2f915c8c64453bd9514c4e1750d995f17215cbc4"
+    # (ro03, rs) - rid = 7b7f4414-a949-5e48-a669-2f203efe6e3f
+    # pat = "0xd0c4ed6f8adf3d7453dc2ece8d66ace20f37550373e653a4802425672ce"
 
     permitted_resources = []
     for perm in li_permissions:

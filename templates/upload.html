@@ -3,27 +3,34 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
 
 <head>
-    <title></title>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" type="text/css"
+        href="{{ staticfile('style.css') }}">
+    <link rel="stylesheet" type="text/css"
+        href="{{ staticfile('procedure.css') }}">
+    <title>FL-Server</title>
 </head>
 
 <body>
     <h1>FL-Server</h1>
-    <p>リソースサーバにモデルをアップロードし，ポリシーを設定する．</p>
+    <p><b>FL-Server User ID: {{ uid }}</b></p>
+    <p>Upload difference data for the machine learning model to the FL-Server and set authorization policies.</p>
     <p>{{ name }} is successfully uploaded!</p>
     <br>
-    <h3>PAT 発行エンドポイントに移動して，PATを発行する．</h3>
+    <h3>Go to the PAT issuing endpoint and issue a PAT.</h3>
     <form action="/redirect-pat" method="post">
-        <button type="submit" value="redirect-pat">issue pat</button>
+        <button type="submit" value="redirect-pat">Issue PAT</button>
     </form>
     <br>
     <br>
-    （手続き内容02）<br>
-    モデル差分の提出が完了した．<br>
-    次のページでは，提出したモデル差分を外部の認可システムを用いて他者によるアクセスから保護するための準備を実行する．<br>
-    すなわち，リソース所有者は認可ブロックチェーン上でPATと呼ばれるアクセストークンを生成し，リソースサーバに対し付与する．<br>
-    </p>
+    <blockquote>
+        <u>Procedure 02</u><br>
+        Submission of the model difference has been completed.
+        On the next page, perform the preparations to protect the submitted model differences using the authorization blockchain.
+        In other words, the resource owner generates an access token called PAT on the authorization blockchain and grants it to the resource server.<br>
+    </blockquote>
 
-    <p><img src="/static/images/rreg02.png" width="841" height="500"></p>
+    <p><img src="/static/images/rreg02.png" width="673" height="400"></p>
 </body>
 
 </html>
